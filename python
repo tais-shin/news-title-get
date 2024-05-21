@@ -1,0 +1,107 @@
+from matplotlib.font_manager import FontProperties
+import requests 
+from bs4 import BeautifulSoup
+from wordcloud import WordCloud
+from PIL import Image
+import jieba
+import numpy as np
+from collections import Counter
+import matplotlib.pyplot as plt
+import datetime
+import pandas as pd
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys 
+import time
+
+
+#文字包
+font = "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Anaconda3 (64-bit)\SourceHanSansTW-Regular.otf"
+jieba.set_dictionary("C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Anaconda3 (64-bit)\dictionary.txt")
+#list設定
+news = list()
+newstitle = list()
+terms = list()
+frame_name = list()
+frame_count = list()
+products = list()
+
+
+font = FontProperties(fname='NotoSansCJKtc-Medium.otf')
+#統計處理函式
+def statistic():
+    for t in jieba.cut(str(newstitle),cut_all=False):
+        terms.append(t)
+    for c in terms:
+        frame_name.append(c)
+        frame_count.append(terms.count(c))
+        while c in terms:
+            terms.remove(c)
+    df = pd.DataFrame(list(zip(frame_name,frame_count)), columns=["Name","count"])
+    df=df.sort_values(by="count",ascending=False)
+    df = df[~df["Name"].isin([","," ",":","、","+","'","：","＋","！","？","」","「","《","》","1","2","3","4","5","6","7","8","9","0","/",'\'','n','t',"r",'[',']','，','<','>' ])]
+    
+    df = df.head(20)
+    df.set_index("Name",inplace=True)
+    chart = df.plot(kind="barh",figsize=(20,20))
+    
+
+    for label in chart.get_yticklabels():
+        label.set_fontproperties("STZhongsong")
+    plt.show()
+
+#爬網站
+#換頁式工商時報
+for page in range(1):
+    res = requests.get("https://ctee.com.tw/livenews/all/page/{}".format(page))
+    soup = BeautifulSoup(res.text,"html.parser")
+    
+    for new in soup.select("div > div > div.col-sm-8.content-column > div.listing.listing-text.listing-text-2.clearfix > div > p > a:nth-child(2)"):
+        news.append(new.text)
+    for i in range(0,len(news)):    
+        a=news[i].split("|")
+        a=a[0].split("\n            ")
+        newstitle.append(a[1])
+    print("工商")
+#滾軸式網頁新聞:經濟日報、鉅亨頭條、商周今日最新
+web = ["https://money.udn.com/rank/newest/1001/0/1?from=edn_navibar","https://news.cnyes.com/news/cat/headline","https://www.businessweekly.com.tw/latest?p=1"]
+selects = ["#wrapper > div > div > main > section > ul.tab-content__list > ul > li > div.story__content > a > h3","#content > div > div > div._2hZZ.theme-app.theme-index._jPyf > main > div._2nhA.theme-left-col > div._2bFl.theme-list > div > a > div._1xc2 > h3","#searchResult > figure > figcaption > div.Article-content.d-xs-flex > a"]
+driver = webdriver.Chrome()
+a = 0
+
+for i in web:
+
+    driver.get(str(i))
+    for i in range(1):
+         driver.execute_script("window.scrollTo(0,document.body.scrollHeight)") 
+         time.sleep(2)
+         driver.execute_script("window.scrollTo(document.body.scrollHeight,0)") 
+    soup = BeautifulSoup(driver.page_source,"lxml")
+    if a==0:
+        news = []
+        products = soup.select(str(selects[0]))
+        for i in products:
+            news.append(i.text)
+        a=a+1
+        for i in range(0,len(news)):    
+            f=news[i].split("                            ")
+            newstitle.append(f)
+        print("經濟")
+    elif a==1:
+        news = []
+        products = soup.select(str(selects[1]))
+        for i in products:
+            news.append(i.text)
+        for i in range(0,len(news)):    
+            f=news[i].split("				")
+            newstitle.append(f)
+        a=a+1
+        print("鉅亨")
+    elif a==2:
+
+        products = soup.select(str(selects[2]))
+        for i in products:
+            newstitle.append(i.text)
+
+        print("商周")
+statistic()
